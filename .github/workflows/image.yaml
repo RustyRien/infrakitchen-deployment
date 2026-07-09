@@ -1,0 +1,60 @@
+name: Infrakitchen Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: "Branch or tag name"
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checkout-to-ik-repo:
+    if: |
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8410ad0602e1e429cee44a835ae9f77f654a6694 # v4.0.0
+
+      - uses: actions/checkout@v7.0.0
+        with:
+          repository: electrolux-oss/infrakitchen
+          ref: ${{ github.event.inputs.branch_name }}
+          path: infrakitchen
+
+      - name: Set image tag
+        run: |
+          if [ "${{ github.event.inputs.branch_name }}" == "main" ]; then
+            echo "tag=$(cat ./infrakitchen/VERSION)" >> $GITHUB_OUTPUT
+          else
+            echo "tag=$(cat ./infrakitchen/VERSION)-$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
+          fi
+        id: image
+
+      - name: Copy Dockerfile
+        run: |
+          ls -la
+          cp Dockerfile ./infrakitchen/Dockerfile
+          cp docker/aws_config ./infrakitchen/aws_config
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./infrakitchen
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_HUB_ORG }}/infrakitchen:${{ steps.image.outputs.tag }}
