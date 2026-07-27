@@ -1,31 +1,53 @@
-FROM docker.io/library/python:3.14-trixie@sha256:dcf12835490de651661bfc30235de1233cf167435ea167c37ba9786affc5dbab AS python_builder
-RUN apt-get update && apt-get install -y curl unzip
+FROM docker.io/library/python:3.14.6-slim-bookworm@sha256:86f975aca15cf04a40b399eebede9aea7c82eae084d1f1a0a6ef6bcaae871a30 AS python_builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip binutils && \
+  rm -rf /var/lib/apt/lists/*
 
 RUN curl -sSL https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_amd64.zip -o tofu.zip && \
   unzip -q tofu.zip
+
+# install awscli v2
+RUN curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && \
+  unzip -q awscliv2.zip && ./aws/install --bin-dir /aws-cli-bin && \
+  rm -rf awscliv2.zip ./aws && \
+  rm -rf /usr/local/aws-cli/v2/current/dist/aws_completer /usr/local/aws-cli/v2/current/dist/awscli/data/ac.index /usr/local/aws-cli/v2/current/dist/awscli/examples
 
 WORKDIR /app
 
 COPY ./server /app
 
 # install UV
-RUN pip install --no-cache-dir uv && uv sync --no-dev --frozen
-RUN mkdir -p build; cp -r src/* build/; cp .env pyproject.toml README.md uv.lock build
+ENV UV_COMPILE_BYTECODE=1 \
+  UV_LINK_MODE=copy \
+  UV_NO_CACHE=1
 
+RUN pip install --no-cache-dir uv && \
+  uv sync --no-dev --frozen
+
+RUN find /app/.venv -type d -name "__pycache__" -prune -exec rm -rf {} + && \
+  find /app/.venv -type d -name "tests" -prune -exec rm -rf {} + && \
+  find /app/.venv -type d -name "test" -prune -exec rm -rf {} + && \
+  find /app/.venv \( -name "*.pyc" -o -name "*.pyi" -o -name "*.pyx" \) -delete; \
+  find /app/.venv -name "*.so" -exec strip --strip-unneeded {} + 2>/dev/null; true
 
 FROM node:24.6.0-bookworm-slim@sha256:9b741b28148b0195d62fa456ed84dd6c953c1f17a3761f3e6e6797a754d9edff AS node_builder
 
-WORKDIR /app
-COPY ./ui /app
-RUN yarn install && yarn build
-
-
-FROM docker.io/library/python:3.14-trixie@sha256:dcf12835490de651661bfc30235de1233cf167435ea167c37ba9786affc5dbab
-
-RUN apt-get update && apt-get install -y git nginx && \
+RUN apt-get update && apt-get install -y --no-install-recommends git && \
   apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --create-home --shell /bin/bash infrakitchen
+WORKDIR /app
+COPY ./ui /app
+RUN yarn install --frozen-lockfile && yarn cache clean && yarn build
+
+
+FROM docker.io/library/python:3.14.6-slim-bookworm@sha256:86f975aca15cf04a40b399eebede9aea7c82eae084d1f1a0a6ef6bcaae871a30
+
+RUN apt-get update && apt-get install -y --no-install-recommends nginx git openssh-client && \
+  apt-get clean && rm -rf /var/lib/apt/lists/* && \
+  useradd --create-home --shell /bin/bash infrakitchen && \
+  mkdir -p /home/infrakitchen/.aws
+
+COPY ./aws_config /home/infrakitchen/.aws/config
 
 COPY ./docs/examples/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY ./docs/examples/docker/websocket-map.conf /etc/nginx/conf.d/websocket-map.conf
@@ -38,9 +60,12 @@ RUN sed -i -e 's/^user www-data;/# user www-data;/' -e 's|pid /run/nginx.pid;|pi
 
 WORKDIR /app
 
-COPY --from=python_builder /app/build /app
 COPY --from=python_builder /app/.venv /app/.venv
+COPY --from=python_builder /app/src /app
 COPY --from=python_builder /tofu /usr/local/bin/tofu
+COPY --from=python_builder /usr/local/aws-cli/ /usr/local/aws-cli/
+COPY --from=python_builder /aws-cli-bin/ /usr/local/bin/
+COPY --from=python_builder /app/.env /app/.env
 COPY ./docs/examples/docker/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh && \
