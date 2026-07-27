@@ -1,13 +1,25 @@
 FROM docker.io/library/python:3.14.6-slim-bookworm@sha256:86f975aca15cf04a40b399eebede9aea7c82eae084d1f1a0a6ef6bcaae871a30 AS python_builder
 
+ARG TARGETARCH
+
 RUN apt-get update && apt-get install -y --no-install-recommends curl unzip binutils && \
   rm -rf /var/lib/apt/lists/*
 
-RUN curl -sSL https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_amd64.zip -o tofu.zip && \
+RUN case "$TARGETARCH" in \
+    amd64) TOFU_ARCH=amd64 ;; \
+    arm64) TOFU_ARCH=arm64 ;; \
+    *) echo "Unsupported arch: $TARGETARCH" && exit 1 ;; \
+  esac && \
+  curl -sSL "https://github.com/opentofu/opentofu/releases/download/v1.10.6/tofu_1.10.6_linux_${TOFU_ARCH}.zip" -o tofu.zip && \
   unzip -q tofu.zip
 
 # install awscli v2
-RUN curl https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip && \
+RUN case "$TARGETARCH" in \
+    amd64) AWSCLI_ARCH=x86_64 ;; \
+    arm64) AWSCLI_ARCH=aarch64 ;; \
+    *) echo "Unsupported arch: $TARGETARCH" && exit 1 ;; \
+  esac && \
+  curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-${AWSCLI_ARCH}.zip" -o awscliv2.zip && \
   unzip -q awscliv2.zip && ./aws/install --bin-dir /aws-cli-bin && \
   rm -rf awscliv2.zip ./aws && \
   rm -rf /usr/local/aws-cli/v2/current/dist/aws_completer /usr/local/aws-cli/v2/current/dist/awscli/data/ac.index /usr/local/aws-cli/v2/current/dist/awscli/examples
