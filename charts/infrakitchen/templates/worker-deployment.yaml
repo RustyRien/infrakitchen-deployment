@@ -1,0 +1,149 @@
+{{- $imageRepository := .Values.worker.image.repository | required "The repository name of the image is required (e.g. my-infrakitchen:tag | docker.io/my-infrakitchen:tag) !" -}}
+{{- $imageTag := default .Values.global.imageTag .Values.worker.image.tag | required "The image tag is required (e.g my-infrakitchen:tag | docker.io/my-infrakitchen:tag) !" -}}
+
+{{- if .Values.worker.enabled -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "infrakitchen.fullname" . }}-worker
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{ include "infrakitchen.labels.standard" . | nindent 4 }}
+    app.kubernetes.io/component: infrakitchen-worker
+    {{- if .Values.commonLabels }}
+    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.commonAnnotations }}
+    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+    {{- end }}
+    {{- if .Values.worker.annotations }}
+    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.annotations "context" $) | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  revisionHistoryLimit: {{ .Values.worker.revisionHistoryLimit }}
+  selector:
+    matchLabels: {{- include "infrakitchen.labels.matchLabels" . | nindent 6 }}
+      app.kubernetes.io/component: infrakitchen-worker
+  template:
+    metadata:
+      labels: {{- include "infrakitchen.labels.standard" . | nindent 8 }}
+        app.kubernetes.io/component: infrakitchen-worker
+        {{- if .Values.worker.podLabels }}
+        {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.podLabels "context" $ ) | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if .Values.worker.podAnnotations }}
+        {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.podAnnotations "context" $ ) | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "infrakitchen.serviceAccountName" . }}
+      {{- if .Values.worker.podSecurityContext }}
+      securityContext:
+        {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.podSecurityContext "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.worker.affinity }}
+      affinity:
+        {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.affinity "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.nodeSelector "context" $) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.worker.tolerations }}
+      tolerations:
+        {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.tolerations "context" $) | nindent 8 }}
+      {{- end }}
+      {{- include "infrakitchen.renderImagePullSecrets" . | nindent 6 }}
+      {{- if .Values.worker.initContainers }}
+      initContainers:
+        {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.initContainers "context" $) | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: infrakitchen-worker
+          image: {{ include "infrakitchen.image" . }}
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy | quote -}}
+          {{- if .Values.worker.containerSecurityContext }}
+          securityContext:
+            {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.containerSecurityContext "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.worker.command }}
+          command: {{- include "infrakitchen.tplvalues.render" (dict "value" .Values.worker.command "context" $) | nindent 12 }}
+          {{- end }}
+
+          {{- if .Values.worker.args }}
+          args:
+          {{- range .Values.worker.args }}
+            - {{ . | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if .Values.worker.resources }}
+          resources: {{- include "infrakitchen.tplvalues.render" (dict "value" .Values.worker.resources "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.worker.readinessProbe }}
+          readinessProbe: {{- include "infrakitchen.tplvalues.render" (dict "value" .Values.worker.readinessProbe "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.worker.livenessProbe }}
+          livenessProbe: {{- include "infrakitchen.tplvalues.render" (dict "value" .Values.worker.livenessProbe "context" $) | nindent 12 }}
+          {{- end }}
+          {{- if .Values.worker.startupProbe }}
+          startupProbe: {{- include "infrakitchen.tplvalues.render" (dict "value" .Values.worker.startupProbe "context" $) | nindent 12 }}
+          {{- end }}
+          env:
+            - name: POSTGRES_HOST
+              value: {{ include "infrakitchen.database.hostname" . }}
+            - name: POSTGRES_PORT
+              value: {{ include "infrakitchen.database.port" . | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.database.user }}
+            - name: POSTGRES_DB
+              value: {{ .Values.database.name }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "infrakitchen.database.secretName" . }}
+                  key: {{ include "infrakitchen.database.secretKey" . }}
+            {{- if or (not .Values.rabbitmq.external.enabled) (not .Values.rabbitmq.external.uri) }}
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "infrakitchen.rabbitmq.secretName" . }}
+                  key: username
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "infrakitchen.rabbitmq.secretName" . }}
+                  key: password
+            {{- end }}
+            - name: BROKER_URL
+              value: {{ include "infrakitchen.rabbitmq.uri" . }}
+            - name: JWT_KEY
+              valueFrom:
+                secretKeyRef:
+                  {{- if empty .Values.secretName }}
+                  name: {{ include "infrakitchen.fullname" . }}-secrets
+                  {{- else  }}
+                  name: {{ .Values.secretName }}
+                  {{- end }}
+                  key: jwt-secret
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  {{- if empty .Values.secretName }}
+                  name: {{ include "infrakitchen.fullname" . }}-secrets
+                  {{- else  }}
+                  name: {{ .Values.secretName }}
+                  {{- end }}
+                  key: enc-secret
+            {{- if .Values.worker.extraEnvVars }}
+            {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.extraEnvVars "context" $) | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: backend
+              containerPort: {{ .Values.worker.containerPorts.backend }}
+              protocol: TCP
+        {{- if .Values.worker.extraContainers }}
+        {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.worker.extraContainers "context" $) | nindent 8 }}
+        {{- end }}
+{{- end }}

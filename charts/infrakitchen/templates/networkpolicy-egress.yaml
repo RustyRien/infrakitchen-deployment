@@ -1,0 +1,38 @@
+{{- if and .Values.networkPolicy.enabled (or .Values.networkPolicy.egressRules.denyConnectionsToExternal .Values.networkPolicy.egressRules.customRules) }}
+apiVersion: {{ include "infrakitchen.capabilities.networkPolicy.apiVersion" . }}
+kind: NetworkPolicy
+metadata:
+  name: {{ printf "%s-egress" (include "infrakitchen.fullname" .) }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{ include "infrakitchen.labels.standard" . | nindent 4 }}
+    app.kubernetes.io/component: infrakitchen
+    {{- if .Values.commonLabels }}
+    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.commonAnnotations }}
+    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+    {{- end }}
+    {{- if .Values.infrakitchen.annotations }}
+    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.infrakitchen.annotations "context" $) | nindent 4 }}
+    {{- end }}
+spec:
+  podSelector:
+    matchLabels:  {{- include "infrakitchen.labels.matchLabels" . | nindent 6 }}
+      app.kubernetes.io/component: infrakitchen
+  policyTypes:
+    - Egress
+  egress:
+    {{- if .Values.networkPolicy.egressRules.denyConnectionsToExternal }}
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - namespaceSelector: {}
+    {{- end }}
+    {{- if .Values.networkPolicy.egressRules.customRules }}
+    {{- include "infrakitchen.tplvalues.render" (dict "value" .Values.networkPolicy.egressRules.customRules "context" $) | nindent 4 }}
+    {{- end }}
+{{- end }}
