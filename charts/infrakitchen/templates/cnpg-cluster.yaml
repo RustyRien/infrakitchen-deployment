@@ -1,0 +1,18 @@
+{{- if not .Values.database.external.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "infrakitchen.database.clusterName" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{- include "infrakitchen.labels.standard" . | nindent 4 }}
+spec:
+  instances: {{ .Values.cnpg.cluster.instances }}
+  storage:
+    size: {{ .Values.cnpg.cluster.storage.size }}
+  bootstrap:
+    initdb:
+      database: {{ .Values.database.name }}
+      owner: {{ .Values.database.user }}
+      secret:
+        name: {{ include "infrakitchen.database.secretName" . }}
+{{- end }}

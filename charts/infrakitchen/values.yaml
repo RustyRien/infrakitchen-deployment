@@ -1,0 +1,784 @@
+# Default values for the Infrakitchen chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# -- Global parameters
+global:
+  # -- Global Docker image registry
+  imageRegistry: ""
+
+  # -- Global Docker image tag shared by all InfraKitchen workloads unless overridden per workload.
+  imageTag: 0.4.0
+
+  # -- Global Docker registry secret names as an array
+  # </br> E.g. `imagePullSecrets: [myRegistryKeySecretName]`
+  imagePullSecrets: []
+
+# -- Common parameters
+
+# -- Override Kubernetes version
+kubeVersion: ""
+
+# -- String to partially override the generated release fullname
+nameOverride: ""
+
+# -- String to fully override the generated release fullname
+fullnameOverride: ""
+
+# -- Default Kubernetes cluster domain
+clusterDomain: cluster.local
+
+# -- Labels to add to all deployed objects
+commonLabels: {}
+
+# -- Annotations to add to all deployed objects
+commonAnnotations: {}
+
+# -- Array of extra objects to deploy with the release
+extraDeploy: []
+
+secrets:
+  # -- Fernet-compatible encryption key used for ENCRYPTION_KEY. The chart base64-encodes it for Secret.data.
+  encSecret: ""
+
+mcp:
+  enabled: true
+
+demo:
+  # -- Run demo fixture generation as a backend init container before the app starts.
+  enabled: false
+
+# -- Ingress parameters
+ingress:
+  # -- Enable the creation of the ingress resource
+  enabled: false
+
+  # -- Name of the IngressClass cluster resource which defines which controller will implement the resource (e.g nginx)
+  className: ""
+
+  # -- Additional annotations for the Ingress resource
+  annotations: {}
+
+  # -- Hostname to be used to expose the route to access the infrakitchen application (e.g: infrakitchen.IP.nip.io)
+  host: ""
+
+  # -- Path to be used to expose the full route to access the infrakitchen application (e.g: IP.nip.io/infrakitchen)
+  path: "/"
+
+  # -- Ingress TLS parameters
+  tls:
+    # -- Enable TLS configuration for the host defined at `ingress.host` parameter
+    enabled: false
+
+    # -- The name to which the TLS Secret will be called
+    secretName: ""
+
+  # -- Service parameters
+  service_name: ""
+
+## InfraKitchen Backend parameters
+##
+# -- InfraKitchen parameters
+# @default -- See below
+backend:
+  # -- Switch to enable or disable the backend deployment
+  enabled: true
+
+  # -- Number of deployment replicas
+  replicas: 1
+
+  # -- Define the [count of deployment revisions](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#clean-up-policy) to be kept.
+  # May be set to 0 in case of GitOps deployment approach.
+  revisionHistoryLimit: 10
+
+  image:
+    # -- Infrakitchen image registry
+    registry: "docker.io"
+
+    # -- Infrakitchen image repository
+    repository: "rustyrien/infrakitchen"
+
+    # -- Infrakitchen image tag (immutable tags are recommended)
+    tag: ""
+
+    # -- Infrakitchen image digest (digest takes precedence over image tag)
+    digest: ""
+
+    # -- Specify a imagePullPolicy.
+    # Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    # <br /> Ref: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
+    pullPolicy: Always
+
+    # -- Optionally specify an array of imagePullSecrets.
+    #  Secrets must be manually created in the namespace.
+    # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    # <br /> E.g: `pullSecrets: [myRegistryKeySecretName]`
+    pullSecrets: []
+
+  # -- Container ports on the Deployment
+  containerPorts:
+    backend: 8080
+
+  # -- Infrakitchen container command
+  command: ""
+
+  # -- Infrakitchen container command arguments
+  args: []
+
+  # -- Deployment sidecars
+  extraContainers: []
+
+  # -- Infrakitchen container environment variables
+  extraEnvVars:
+    - name: SESSION_EXPIRATION
+      value: "86400"
+
+  # -- Infrakitchen container init containers
+  initContainers: []
+
+  # -- Resource requests/limits
+  # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
+  # <!-- E.g.
+  # resources:
+  #   limits:
+  #     memory: 1Gi
+  #     cpu: 1000m
+  #   requests:
+  #     memory: 250Mi
+  #     cpu: 100m -->
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 200m
+      memory: 1024Mi
+
+  # -- Readiness Probe
+  # <!-- E.g.
+  # readinessProbe:
+  #   failureThreshold: 3
+  #   httpGet:
+  #     path: /healthcheck
+  #     port: 8080
+  #     scheme: HTTP
+  #   initialDelaySeconds: 30
+  #   periodSeconds: 10
+  #   successThreshold: 2
+  #   timeoutSeconds: 2
+  readinessProbe:
+    httpGet:
+      path: /healthcheck
+      port: 8080
+    failureThreshold: 10
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 1
+
+  # -- Liveness Probe
+  # <!-- E.g.
+  # livenessProbe:
+  #   failureThreshold: 3
+  #   httpGet:
+  #     path: /healthcheck
+  #     port: 8080
+  #     scheme: HTTP
+  #   initialDelaySeconds: 60
+  #   periodSeconds: 10
+  #   successThreshold: 1
+  #   timeoutSeconds: 2
+  livenessProbe:
+    httpGet:
+      path: /healthcheck
+      port: 8080
+    failureThreshold: 10
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 1
+    # -- Startup Probe
+  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
+  # <!-- E.g.
+  # startupProbe:
+  #   failureThreshold: 3
+  #   httpGet:
+  #     path: /healthcheck
+  #     port: 8080
+  #     scheme: HTTP
+  #   initialDelaySeconds: 60
+  #   periodSeconds: 10
+  #   successThreshold: 1
+  #   timeoutSeconds: 2
+  startupProbe: {}
+
+  # -- Security settings for a Pod.
+  #  The security settings that you specify for a Pod apply to all Containers in the Pod.
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+  podSecurityContext: {}
+
+  # -- Security settings for a Container.
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+  containerSecurityContext: {}
+
+  # -- Affinity for pod assignment
+  # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+
+  # -- Node labels for pod assignment
+  # <br /> Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+  nodeSelector: {}
+
+  # -- Node tolerations for server scheduling to nodes with taints
+  # <br /> Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
+  #  - key: "key"
+  #    operator: "Equal|Exists"
+  #    value: "value"
+  #    effect: "NoSchedule|PreferNoSchedule|NoExecute"
+
+  # -- Annotations to add to the backend deployment pods
+  podAnnotations: {}
+
+  # -- Labels to add to the backend deployment pods
+  podLabels: {}
+
+  # -- Additional custom annotations for the `Deployment` resource
+  annotations: {}
+
+## InfraKitchen Worker parameters
+##
+# -- InfraKitchen parameters
+# @default -- See below
+worker:
+  # -- Switch to enable or disable the worker deployment
+  enabled: true
+
+  # -- Number of deployment replicas
+  replicas: 1
+
+  # -- Define the [count of deployment revisions](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#clean-up-policy) to be kept.
+  # May be set to 0 in case of GitOps deployment approach.
+  revisionHistoryLimit: 10
+
+  image:
+    # -- Infrakitchen image registry
+    registry: "docker.io"
+
+    # -- Infrakitchen image repository
+    repository: "rustyrien/infrakitchen"
+
+    # -- Infrakitchen image tag (immutable tags are recommended)
+    tag: ""
+
+    # -- Infrakitchen image digest (digest takes precedence over image tag)
+    digest: ""
+
+    # -- Specify a imagePullPolicy.
+    # Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    # <br /> Ref: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
+    pullPolicy: Always
+
+    # -- Optionally specify an array of imagePullSecrets.
+    #  Secrets must be manually created in the namespace.
+    # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    # <br /> E.g: `pullSecrets: [myRegistryKeySecretName]`
+    pullSecrets: []
+
+  # -- Container ports on the Deployment
+  containerPorts:
+    backend: 8080
+
+  # -- Infrakitchen container command
+  command: ["/app/.venv/bin/python", "worker.py"]
+
+  # -- Infrakitchen container command arguments
+  args: []
+
+  # -- Deployment sidecars
+  extraContainers: []
+
+  # -- Infrakitchen container environment variables
+  extraEnvVars: []
+
+  # -- Infrakitchen container init containers
+  initContainers: []
+
+  # -- Resource requests/limits
+  # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
+  # <!-- E.g.
+  # resources:
+  #   limits:
+  #     memory: 1Gi
+  #     cpu: 1000m
+  #   requests:
+  #     memory: 250Mi
+  #     cpu: 100m -->
+  resources:
+    requests:
+      cpu: 300m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+  # -- Readiness Probe
+  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
+  # <!-- E.g.
+  # readinessProbe:
+  #   failureThreshold: 3
+  #   httpGet:
+  #     path: /healthcheck
+  #     port: 8080
+  #     scheme: HTTP
+  #   initialDelaySeconds: 30
+  #   periodSeconds: 10
+  #   successThreshold: 2
+  #   timeoutSeconds: 2
+  readinessProbe: {}
+
+  # -- Liveness Probe
+  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
+  # <!-- E.g.
+  # livenessProbe:
+  #   failureThreshold: 3
+  #   httpGet:
+  #     path: /healthcheck
+  #     port: 8080
+  #     scheme: HTTP
+  #   initialDelaySeconds: 60
+  #   periodSeconds: 10
+  #   successThreshold: 1
+  #   timeoutSeconds: 2
+  livenessProbe: {}
+
+    # -- Startup Probe
+  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
+  # <!-- E.g.
+  # startupProbe:
+  #   failureThreshold: 3
+  #   httpGet:
+  #     path: /healthcheck
+  #     port: 8080
+  #     scheme: HTTP
+  #   initialDelaySeconds: 60
+  #   periodSeconds: 10
+  #   successThreshold: 1
+  #   timeoutSeconds: 2
+  startupProbe: {}
+
+  # -- Security settings for a Pod.
+  #  The security settings that you specify for a Pod apply to all Containers in the Pod.
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+  podSecurityContext: {}
+
+  # -- Security settings for a Container.
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+  containerSecurityContext: {}
+
+  # -- Affinity for pod assignment
+  # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+
+  # -- Node labels for pod assignment
+  # <br /> Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+  nodeSelector: {}
+
+  # -- Node tolerations for server scheduling to nodes with taints
+  # <br /> Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
+  #  - key: "key"
+  #    operator: "Equal|Exists"
+  #    value: "value"
+  #    effect: "NoSchedule|PreferNoSchedule|NoExecute"
+
+  # -- Annotations to add to the backend deployment pods
+  podAnnotations: {}
+
+  # -- Labels to add to the backend deployment pods
+  podLabels: {}
+
+  # -- Additional custom annotations for the `Deployment` resource
+  annotations: {}
+
+## @section Traffic Exposure parameters
+
+## Service parameters
+##
+# -- Service parameters
+# @default -- See below
+service:
+  # -- Kubernetes Service type
+  type: ClusterIP
+
+  # -- Infrakitchen svc port for client connections
+  ports:
+    backend: 8080
+
+    # -- Infrakitchen svc port name
+    name: http-backend
+
+    # -- Infrakitchen svc target port referencing receiving pod container port
+    targetPort: backend
+
+  # -- Node port for the Infrakitchen client connections
+  # Choose port between `30000-32767`
+  nodePorts:
+    backend: ""
+
+  # -- Control where client requests go, to the same pod or round-robin
+  # (values: `ClientIP` or `None`)
+  # <br /> Ref: https://kubernetes.io/docs/concepts/services-networking/service/#session-stickiness
+  sessionAffinity: None
+
+  # -- Infrakitchen service Cluster IP
+  #
+  # <br /> E.g `clusterIP: None`
+  clusterIP: ""
+
+  # -- Infrakitchen service Load Balancer IP
+  #
+  # <br /> Ref: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+  loadBalancerIP: ""
+
+  # -- Load Balancer sources
+  #
+  # <br /> Ref: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+  # <br /> E.g `loadBalancerSourceRanges: [10.10.10.0/24]`
+  loadBalancerSourceRanges: []
+
+  # -- Infrakitchen service external traffic policy
+  #
+  # Ref: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+  externalTrafficPolicy: Cluster
+
+  # -- Additional custom annotations for Infrakitchen service
+  annotations: {}
+
+  # -- Extra ports to expose in the Infrakitchen service (normally used with the `sidecar` value)
+  extraPorts: []
+
+## @section NetworkPolicy parameters
+##
+networkPolicy:
+  # -- Specifies whether a NetworkPolicy should be created
+  enabled: false
+
+  ## Ingress Rules
+  ##
+  ingressRules:
+    # -- Namespace selector label allowed to access the Infrakitchen instance
+    namespaceSelector: {}
+
+    # -- Pod selector label allowed to access the Infrakitchen instance
+    podSelector: {}
+
+    # -- Additional custom ingress rules
+    customRules: []
+    #   - to:
+    #       - namespaceSelector:
+    #           matchLabels:
+    #             label: example
+
+  ## Egress Rules
+  ##
+  egressRules:
+    # -- Deny external connections. Should not be enabled when working with an external database.
+    denyConnectionsToExternal: false
+
+    # -- Additional custom egress rules
+    customRules: []
+    #   - to:
+    #       - namespaceSelector:
+    #           matchLabels:
+    #             label: example
+
+# -- Database connection settings consumed by InfraKitchen workloads.
+# @default -- See below
+database:
+  # -- Database name used by the application.
+  name: infrakitchen
+
+  # -- Database user used by the application.
+  user: infrakitchen
+
+  # -- Database port used by the application.
+  port: 5432
+
+  # -- The password key in the Kubernetes Secret consumed by InfraKitchen workloads.
+  passwordKey: password
+
+  # -- Run database migrations from the backend deployment.
+  applyMigrations: true
+
+  external:
+    # -- Use an externally managed PostgreSQL database instead of a CNPG cluster created by this chart.
+    enabled: false
+
+    # -- Hostname of the external PostgreSQL database. Required when external mode is enabled.
+    host: ""
+
+    # -- Existing secret containing the external database password. Required when external mode is enabled.
+    existingSecret: ""
+
+    # -- Key inside the external database secret containing the password.
+    passwordKey: password
+
+# -- CloudNativePG cluster settings managed by this chart.
+# @default -- See below
+cnpg:
+  cluster:
+    # -- Set a custom name for the CNPG cluster. Defaults to `<release>-infrakitchen-db`.
+    name: ""
+
+    # -- Number of PostgreSQL instances in the CNPG cluster.
+    instances: 1
+
+    storage:
+      # -- Persistent volume size for each CNPG instance.
+      size: 4Gi
+
+  bootstrap:
+    # -- Existing secret containing the bootstrap/application credentials.
+    # The Secret must provide `username` and `password` keys and the username must match `database.user`.
+    existingSecret: ""
+
+    # -- Password used for the application database user when creating a new secret.
+    # Required when `cnpg.bootstrap.existingSecret` is empty.
+    password: ""
+
+    # -- Kubernetes secret type for the generated CNPG bootstrap secret.
+    secretType: kubernetes.io/basic-auth
+
+rabbitmq:
+  cluster:
+    # -- Name of the managed RabbitmqCluster resource.
+    name: ""
+
+    # -- Number of RabbitMQ replicas.
+    replicas: 1
+
+    persistence:
+      # -- Enable persistent storage for the managed RabbitMQ cluster.
+      enabled: false
+
+      # -- Size of the RabbitMQ persistent volume claim.
+      storage: 4Gi
+
+    resources: {}
+
+    # -- Additional RabbitMQ configuration appended to rabbitmq.conf.
+    additionalConfig: |-
+      consumer_timeout = 144000000
+
+  auth:
+    # -- Existing secret containing RabbitMQ credentials for managed RabbitMQ.
+    # The Secret must provide `username` and `password` keys.
+    # If not set, the chart uses the operator-generated `<cluster>-default-user` secret.
+    existingSecret: ""
+
+    # -- RabbitMQ username for the managed cluster when supplying your own secret.
+    username: ""
+
+    # -- RabbitMQ password for the managed cluster when supplying your own secret.
+    password: ""
+
+  external:
+    # -- Use an external RabbitMQ instance instead of rendering a RabbitmqCluster.
+    enabled: false
+
+    # -- RabbitMQ connection URI used when `rabbitmq.external.enabled` is true.
+    # If set, no RabbitMQ credential secret is referenced by the application pods.
+    uri: ""
+
+    # -- Existing secret containing external RabbitMQ credentials.
+    # Used when `rabbitmq.external.uri` is not set. The Secret must provide
+    # `username` and `password` keys.
+    existingSecret: ""
+
+    # -- External RabbitMQ hostname used when `rabbitmq.external.uri` is not set.
+    host: ""
+
+    # -- External RabbitMQ port used when `rabbitmq.external.uri` is not set.
+    port: 5672
+
+# -- Service Account Configuration
+# @default -- See below
+serviceAccount:
+  # -- Enable the creation of a ServiceAccount for Infrakitchen pods
+  create: false
+
+  # -- Name of the ServiceAccount to use
+  # If not set and `serviceAccount.create` is true, a name is generated
+  name: ""
+
+  # -- Additional custom labels to the service ServiceAccount.
+  labels: {}
+
+  # -- Additional custom annotations for the ServiceAccount.
+  annotations: {}
+
+  # -- Auto-mount the service account token in the pod
+  automountServiceAccountToken: true
+
+## InfraKitchen Scheduler parameters
+##
+# -- InfraKitchen parameters
+# @default -- See below
+scheduler:
+  # -- Switch to enable or disable the scheduler deployment
+  enabled: true
+
+  # -- Number of deployment replicas
+  replicas: 1
+
+  # -- Define the [count of deployment revisions](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#clean-up-policy) to be kept.
+  # May be set to 0 in case of GitOps deployment approach.
+  revisionHistoryLimit: 10
+
+  image:
+    # -- Infrakitchen image registry
+    registry: "docker.io"
+
+    # -- Infrakitchen image repository
+    repository: "rustyrien/infrakitchen"
+
+    # -- Infrakitchen image tag (immutable tags are recommended)
+    tag: ""
+
+    # -- Infrakitchen image digest (digest takes precedence over image tag)
+    digest: ""
+
+    # -- Specify a imagePullPolicy.
+    # Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    # <br /> Ref: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
+    pullPolicy: Always
+
+    # -- Optionally specify an array of imagePullSecrets.
+    #  Secrets must be manually created in the namespace.
+    # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    # <br /> E.g: `pullSecrets: [myRegistryKeySecretName]`
+    pullSecrets: []
+
+  # -- Container ports on the Deployment
+  containerPorts:
+    backend: 8080
+
+  # -- Infrakitchen container command
+  command: ["/app/.venv/bin/python", "scheduler.py"]
+
+  # -- Infrakitchen container command arguments
+  args: []
+
+  # -- Deployment sidecars
+  extraContainers: []
+
+  # -- Infrakitchen container environment variables
+  extraEnvVars: []
+
+  # -- Infrakitchen container init containers
+  initContainers: []
+
+  # -- Resource requests/limits
+  # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
+  # <!-- E.g.
+  # resources:
+  #   limits:
+  #     memory: 1Gi
+  #     cpu: 1000m
+  #   requests:
+  #     memory: 250Mi
+  #     cpu: 100m -->
+  resources:
+    requests:
+      cpu: 300m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+  # -- Readiness Probe
+  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
+  # <!-- E.g.
+  # readinessProbe:
+  #   failureThreshold: 3
+  #   httpGet:
+  #     path: /healthcheck
+  #     port: 8080
+  #     scheme: HTTP
+  #   initialDelaySeconds: 30
+  #   periodSeconds: 10
+  #   successThreshold: 2
+  #   timeoutSeconds: 2
+  readinessProbe: {}
+
+  # -- Liveness Probe
+  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
+  # <!-- E.g.
+  # livenessProbe:
+  #   failureThreshold: 3
+  #   httpGet:
+  #     path: /healthcheck
+  #     port: 8080
+  #     scheme: HTTP
+  #   initialDelaySeconds: 60
+  #   periodSeconds: 10
+  #   successThreshold: 1
+  #   timeoutSeconds: 2
+  livenessProbe: {}
+
+  # -- Startup Probe
+  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
+  # <!-- E.g.
+  # startupProbe:
+  #   failureThreshold: 3
+  #   httpGet:
+  #     path: /healthcheck
+  #     port: 8080
+  #     scheme: HTTP
+  #   initialDelaySeconds: 60
+  #   periodSeconds: 10
+  #   successThreshold: 1
+  #   timeoutSeconds: 2
+  startupProbe: {}
+
+  # -- Security settings for a Pod.
+  #  The security settings that you specify for a Pod apply to all Containers in the Pod.
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
+  podSecurityContext: {}
+
+  # -- Security settings for a Container.
+  # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
+  containerSecurityContext: {}
+
+  # -- Affinity for pod assignment
+  # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+  affinity: {}
+
+  # -- Node labels for pod assignment
+  # <br /> Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+  nodeSelector: {}
+
+  # -- Node tolerations for server scheduling to nodes with taints
+  # <br /> Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
+  tolerations: []
+  #  - key: "key"
+  #    operator: "Equal|Exists"
+  #    value: "value"
+  #    effect: "NoSchedule|PreferNoSchedule|NoExecute"
+
+  # -- Annotations to add to the backend deployment pods
+  podAnnotations: {}
+
+  # -- Labels to add to the backend deployment pods
+  podLabels: {}
+
+  # -- Additional custom annotations for the `Deployment` resource
+  annotations: {}

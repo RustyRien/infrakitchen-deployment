@@ -1,0 +1,22 @@
+{{- if not .Values.rabbitmq.external.enabled }}
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: {{ include "infrakitchen.rabbitmq.clusterName" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "infrakitchen.labels.standard" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.rabbitmq.cluster.replicas }}
+  {{- if .Values.rabbitmq.cluster.persistence.enabled }}
+  persistence:
+    storage: {{ .Values.rabbitmq.cluster.persistence.storage }}
+  {{- end }}
+  rabbitmq:
+    additionalConfig: |
+{{ .Values.rabbitmq.cluster.additionalConfig | indent 6 }}
+  {{- with .Values.rabbitmq.cluster.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

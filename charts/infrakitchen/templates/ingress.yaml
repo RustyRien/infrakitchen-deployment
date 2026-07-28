@@ -1,0 +1,44 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "infrakitchen.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels: {{- include "infrakitchen.labels.standard" . | nindent 4 }}
+    app.kubernetes.io/component: infrakitchen
+    {{- if .Values.commonLabels }}
+    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.ingress.annotations }}
+    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.ingress.annotations "context" $) | nindent 4 }}
+    {{- end }}
+    {{- if .Values.commonAnnotations }}
+    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- end }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+      - {{ include "infrakitchen.tplvalues.render" ( dict "value" .Values.ingress.host "context" $ ) }}
+      secretName: {{ include "infrakitchen.tplvalues.render" ( dict "value" .Values.ingress.tls.secretName "context" $ ) }}
+  {{- end }}
+  rules:
+    - host: {{ include "infrakitchen.tplvalues.render" ( dict "value" .Values.ingress.host "context" $ ) }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                {{- if .Values.ingress.service_name }}
+                name: {{ .Values.ingress.service_name }}
+                {{- else }}
+                name: {{ include "infrakitchen.fullname" . }}
+                {{- end }}
+                port:
+                  number: {{ .Values.service.ports.backend }}
+{{- end }}
