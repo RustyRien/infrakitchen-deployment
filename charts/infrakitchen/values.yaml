@@ -16,17 +16,11 @@ global:
 
 # -- Common parameters
 
-# -- Override Kubernetes version
-kubeVersion: ""
-
 # -- String to partially override the generated release fullname
 nameOverride: ""
 
 # -- String to fully override the generated release fullname
 fullnameOverride: ""
-
-# -- Default Kubernetes cluster domain
-clusterDomain: cluster.local
 
 # -- Labels to add to all deployed objects
 commonLabels: {}
