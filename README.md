@@ -4,6 +4,8 @@ A centralized repository for packaging, containerizing, and deploying the InfraK
 
 ## Getting Started
 
+### Local Development or Testing
+
 For testing purposes [Minikube](https://minikube.sigs.k8s.io/docs/start/) can be used.
 kubectl and helm must be installed on your local machine.
 
@@ -22,6 +24,24 @@ kubectl port-forward svc/test-infrakitchen 8080 -n ik
 
 Open your browser and navigate to [http://localhost:8080](http://localhost:8080) to access the InfraKitchen UI.
 Login with Guest Super user to get full access to the demo.
+
+### Using Helm Charts
+
+[Chart docs](https://rustyrien.github.io/infrakitchen-deployment/charts/infrakitchen/) provide detailed information on how to use the Helm charts for deploying InfraKitchen.
+
+```bash
+helm repo add infrakitchen https://RustyRien.github.io/infrakitchen-deployment
+helm repo update
+```
+
+helm command examples:
+
+```bash
+helm upgrade --install test infrakitchen/infrakitchen --set "cnpg.bootstrap.password=securepass" --set "global.imageTag=0.4.0-20260728121251" \
+  --set "secrets.encSecret=MWhVVmYtQ3dFNDc3ODdrTEJ1TUx4cUpLcm1ZTFQ4TlRsZlY0RnpMV0owVT0=" -n ik --create-namespace
+```
+
+[Docker Hub](https://hub.docker.com/r/rustyrien/infrakitchen/tags) contains the latest images for the InfraKitchen.
 
 ## Clean Up
 
