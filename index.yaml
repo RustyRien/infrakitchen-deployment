@@ -1,0 +1,24 @@
+apiVersion: v1
+entries:
+  infrakitchen:
+  - annotations:
+      artifacthub.io/category: integration-delivery
+      artifacthub.io/license: Apache-2.0
+    apiVersion: v2
+    created: "2026-07-29T08:21:02.197974806Z"
+    description: A Helm chart for deploying a InfraKitchen application
+    digest: 00ddcca8f17dcb044324529059140b149991df19450ecb183d50f9c0721dd81b
+    home: https://github.com/electrolux-oss/infrakitchen
+    keywords:
+    - idp
+    - infrakitchen
+    - automation
+    kubeVersion: '>= 1.30.0-0'
+    name: infrakitchen
+    sources:
+    - https://github.com/RustyRien/infrakitchen-deployment
+    type: application
+    urls:
+    - https://github.com/RustyRien/infrakitchen-deployment/releases/download/infrakitchen-1.0.0/infrakitchen-1.0.0.tgz
+    version: 1.0.0
+generated: "2026-07-29T08:21:02.197994252Z"
