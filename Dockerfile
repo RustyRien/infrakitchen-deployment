@@ -45,11 +45,11 @@ RUN find /app/.venv -type d -name "__pycache__" -prune -exec rm -rf {} + && \
 FROM node:26.7.0-bookworm-slim@sha256:c00614442a3c693109886209462dd1b15462f6726347fa9cb9fc0125ca26f275 AS node_builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends git && \
-  apt-get clean && rm -rf /var/lib/apt/lists/*
+  apt-get clean && rm -rf /var/lib/apt/lists/* && npm install -g corepack
 
 WORKDIR /app
 COPY ./ /app
-RUN cd ./ui && yarn install --frozen-lockfile && yarn cache clean && yarn build
+RUN cd ./ui && yarn install --immutable && yarn cache clean && yarn build
 
 
 FROM docker.io/library/python:3.14.6-slim-bookworm@sha256:86f975aca15cf04a40b399eebede9aea7c82eae084d1f1a0a6ef6bcaae871a30
