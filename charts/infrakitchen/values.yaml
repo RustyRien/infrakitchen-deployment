@@ -568,6 +568,7 @@ rabbitmq:
     # -- Additional RabbitMQ configuration appended to rabbitmq.conf.
     additionalConfig: |-
       consumer_timeout = 144000000
+      deprecated_features.permit.transient_nonexcl_queues = true
 
   auth:
     # -- Existing secret containing RabbitMQ credentials for managed RabbitMQ.
