@@ -80,20 +80,6 @@ spec:
                 secretKeyRef:
                   name: {{ include "infrakitchen.database.secretName" . }}
                   key: {{ include "infrakitchen.database.secretKey" . }}
-            {{- if or (not .Values.rabbitmq.external.enabled) (not .Values.rabbitmq.external.uri) }}
-            - name: RABBITMQ_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "infrakitchen.rabbitmq.secretName" . }}
-                  key: username
-            - name: RABBITMQ_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "infrakitchen.rabbitmq.secretName" . }}
-                  key: password
-            {{- end }}
-            - name: BROKER_URL
-              value: {{ include "infrakitchen.rabbitmq.uri" . }}
             - name: JWT_KEY
               valueFrom:
                 secretKeyRef:
@@ -165,20 +151,6 @@ spec:
                   key: {{ include "infrakitchen.database.secretKey" . }}
             - name: MCP_ENABLED
               value: {{ .Values.mcp.enabled | quote }}
-            {{- if or (not .Values.rabbitmq.external.enabled) (not .Values.rabbitmq.external.uri) }}
-            - name: RABBITMQ_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "infrakitchen.rabbitmq.secretName" . }}
-                  key: username
-            - name: RABBITMQ_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "infrakitchen.rabbitmq.secretName" . }}
-                  key: password
-            {{- end }}
-            - name: BROKER_URL
-              value: {{ include "infrakitchen.rabbitmq.uri" . }}
             - name: JWT_KEY
               valueFrom:
                 secretKeyRef:

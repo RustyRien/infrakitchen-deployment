@@ -23,30 +23,6 @@ Set:
 
 In external mode, this chart does not render CNPG resources.
 
-## RabbitMQ
-
-This chart manages a RabbitMQ `RabbitmqCluster` by default.
-
-- Install the RabbitMQ Cluster Operator and CRDs before installing this chart.
-- Follow the official operator install docs: <https://www.rabbitmq.com/kubernetes/operator/install-operator>
-- If `rabbitmq.auth.existingSecret` is not set, this chart uses the RabbitMQ operator-generated `<cluster-name>-default-user` Secret.
-- In managed mode, InfraKitchen reads `username` and `password` from that Secret and builds `BROKER_URL` against the managed RabbitMQ service.
-
-### Managed RabbitMQ
-
-Install the chart after the RabbitMQ Cluster Operator is available.
-If you want to override the operator-generated secret, set `rabbitmq.auth.existingSecret` to a Secret that provides `username` and `password`.
-
-### External RabbitMQ
-
-Set:
-
-- `rabbitmq.external.enabled=true`
-- either `rabbitmq.external.uri`
-- or `rabbitmq.external.host` and `rabbitmq.external.existingSecret`
-
-In external mode, this chart does not render RabbitMQ operator resources.
-
 ## Secrets
 
 This chart auto-generates `jwt-secret`, but `enc-secret` must be provided as a Fernet key on first install. After the Secret exists, later upgrades reuse the stored value and do not require `secrets.encSecret` again.

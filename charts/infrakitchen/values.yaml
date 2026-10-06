@@ -548,59 +548,6 @@ cnpg:
     # -- Kubernetes secret type for the generated CNPG bootstrap secret.
     secretType: kubernetes.io/basic-auth
 
-rabbitmq:
-  cluster:
-    # -- Name of the managed RabbitmqCluster resource.
-    name: ""
-
-    # -- Number of RabbitMQ replicas.
-    replicas: 1
-
-    persistence:
-      # -- Enable persistent storage for the managed RabbitMQ cluster.
-      enabled: false
-
-      # -- Size of the RabbitMQ persistent volume claim.
-      storage: 4Gi
-
-    resources: {}
-
-    # -- Additional RabbitMQ configuration appended to rabbitmq.conf.
-    additionalConfig: |-
-      consumer_timeout = 144000000
-      deprecated_features.permit.transient_nonexcl_queues = true
-
-  auth:
-    # -- Existing secret containing RabbitMQ credentials for managed RabbitMQ.
-    # The Secret must provide `username` and `password` keys.
-    # If not set, the chart uses the operator-generated `<cluster>-default-user` secret.
-    existingSecret: ""
-
-    # -- RabbitMQ username for the managed cluster when supplying your own secret.
-    username: ""
-
-    # -- RabbitMQ password for the managed cluster when supplying your own secret.
-    password: ""
-
-  external:
-    # -- Use an external RabbitMQ instance instead of rendering a RabbitmqCluster.
-    enabled: false
-
-    # -- RabbitMQ connection URI used when `rabbitmq.external.enabled` is true.
-    # If set, no RabbitMQ credential secret is referenced by the application pods.
-    uri: ""
-
-    # -- Existing secret containing external RabbitMQ credentials.
-    # Used when `rabbitmq.external.uri` is not set. The Secret must provide
-    # `username` and `password` keys.
-    existingSecret: ""
-
-    # -- External RabbitMQ hostname used when `rabbitmq.external.uri` is not set.
-    host: ""
-
-    # -- External RabbitMQ port used when `rabbitmq.external.uri` is not set.
-    port: 5672
-
 # -- Service Account Configuration
 # @default -- See below
 serviceAccount:
