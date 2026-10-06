@@ -3,8 +3,7 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: {{ include "infrakitchen.database.clusterName" . }}
-  namespace: {{ .Release.Namespace | quote }}
-  labels: {{- include "infrakitchen.labels.standard" . | nindent 4 }}
+  {{- include "infrakitchen.metadata" (dict "component" "database" "context" $) | nindent 2 }}
 spec:
   instances: {{ .Values.cnpg.cluster.instances }}
   storage:

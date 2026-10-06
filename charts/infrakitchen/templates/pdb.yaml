@@ -1,0 +1,17 @@
+{{- if and .Values.backend.enabled .Values.backend.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "infrakitchen.fullname" . }}
+  {{- include "infrakitchen.metadata" (dict "component" "infrakitchen" "context" $) | nindent 2 }}
+spec:
+  {{- if not (kindIs "invalid" .Values.backend.pdb.maxUnavailable) }}
+  maxUnavailable: {{ .Values.backend.pdb.maxUnavailable }}
+  {{- else }}
+  minAvailable: {{ .Values.backend.pdb.minAvailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "infrakitchen.labels.matchLabels" . | nindent 6 }}
+      app.kubernetes.io/component: infrakitchen
+{{- end }}

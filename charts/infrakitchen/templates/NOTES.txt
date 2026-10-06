@@ -1,0 +1,26 @@
+InfraKitchen {{ .Chart.AppVersion }} has been deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+{{- if .Values.backend.enabled }}
+
+Access the application:
+{{- if .Values.ingress.enabled }}
+  http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ include "infrakitchen.tplvalues.render" (dict "value" .Values.ingress.host "context" $) }}{{ .Values.ingress.path }}
+{{- else }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "infrakitchen.fullname" . }} 8080:{{ .Values.service.ports.backend }}
+  Then open http://127.0.0.1:8080
+{{- end }}
+{{- end }}
+
+Secrets:
+{{- if .Values.secretName }}
+  JWT and encryption keys are read from the existing Secret "{{ .Values.secretName }}".
+{{- else }}
+  JWT and encryption keys are stored in Secret "{{ include "infrakitchen.secretName" . }}" (kept on uninstall).
+  Back up the "enc-secret" key: data encrypted with it cannot be recovered without it.
+{{- end }}
+{{- if not .Values.database.external.enabled }}
+
+Database:
+  CloudNativePG cluster "{{ include "infrakitchen.database.clusterName" . }}" (requires the CNPG operator).
+  Credentials are stored in Secret "{{ include "infrakitchen.database.secretName" . }}".
+{{- end }}

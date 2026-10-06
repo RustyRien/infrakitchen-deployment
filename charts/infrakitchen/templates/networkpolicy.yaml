@@ -1,40 +1,34 @@
-{{- if and .Values.networkPolicy.enabled (or .Values.networkPolicy.ingressRules.namespaceSelector .Values.networkPolicy.ingressRules.podSelector .Values.networkPolicy.ingressRules.customRules) }}
-apiVersion: {{ include "infrakitchen.capabilities.networkPolicy.apiVersion" . }}
+{{- $rules := .Values.networkPolicy.ingressRules }}
+{{- if and .Values.networkPolicy.enabled (or $rules.namespaceSelector $rules.podSelector $rules.customRules) }}
+apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ include "infrakitchen.fullname" . }}
-  namespace: {{ .Release.Namespace | quote }}
-  labels: {{ include "infrakitchen.labels.standard" . | nindent 4 }}
-    app.kubernetes.io/component: infrakitchen
-    {{- if .Values.commonLabels }}
-    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.commonLabels "context" $ ) | nindent 4 }}
-    {{- end }}
-  annotations:
-    {{- if .Values.commonAnnotations }}
-    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.commonAnnotations "context" $ ) | nindent 4 }}
-    {{- end }}
-    {{- if .Values.infrakitchen.annotations }}
-    {{- include "infrakitchen.tplvalues.render" ( dict "value" .Values.infrakitchen.annotations "context" $) | nindent 4 }}
-    {{- end }}
+  {{- include "infrakitchen.metadata" (dict "component" "infrakitchen" "context" $) | nindent 2 }}
 spec:
   podSelector:
-    matchLabels: {{- include "infrakitchen.labels.matchLabels" . | nindent 6 }}
-      app.kubernetes.io/component: infrakitchen
+    matchLabels:
+      {{- include "infrakitchen.labels.matchLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
   ingress:
-    {{- if or .Values.networkPolicy.ingressRules.namespaceSelector .Values.networkPolicy.ingressRules.podSelector }}
+    {{- if or $rules.namespaceSelector $rules.podSelector }}
     - from:
-        {{- if .Values.networkPolicy.ingressRules.namespaceSelector }}
+        {{- with $rules.namespaceSelector }}
         - namespaceSelector:
-            matchLabels: {{- include "infrakitchen.tplvalues.render" (dict "value" .Values.networkPolicy.ingressRules.namespaceSelector "context" $) | nindent 14 }}
+            matchLabels:
+              {{- include "infrakitchen.tplvalues.render" (dict "value" . "context" $) | nindent 14 }}
         {{- end }}
-        {{- if .Values.networkPolicy.ingressRules.podSelector }}
+        {{- with $rules.podSelector }}
         - podSelector:
-            matchLabels: {{- include "infrakitchen.tplvalues.render" (dict "value" .Values.networkPolicy.ingressRules.podSelector "context" $) | nindent 14 }}
+            matchLabels:
+              {{- include "infrakitchen.tplvalues.render" (dict "value" . "context" $) | nindent 14 }}
         {{- end }}
       ports:
-        - port: {{ .Values.infrakitchen.containerPorts.backend }}
+        - port: {{ .Values.backend.containerPorts.backend }}
+          protocol: TCP
     {{- end }}
-    {{- if .Values.networkPolicy.ingressRules.customRules }}
-    {{- include "infrakitchen.tplvalues.render" (dict "value" .Values.networkPolicy.ingressRules.customRules "context" $) | nindent 4 }}
+    {{- with $rules.customRules }}
+    {{- include "infrakitchen.tplvalues.render" (dict "value" . "context" $) | nindent 4 }}
     {{- end }}
 {{- end }}
