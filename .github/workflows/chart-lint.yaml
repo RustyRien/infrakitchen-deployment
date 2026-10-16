@@ -1,0 +1,48 @@
+name: Lint Helm Chart
+
+on:
+  pull_request:
+    paths:
+      - "charts/infrakitchen/**"
+      - ".github/workflows/chart-lint.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      CHART: charts/infrakitchen
+      VALUES: charts/infrakitchen/ci/default-values.yaml
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz -C /usr/local/bin kubeconform
+
+      - name: Helm lint
+        run: helm lint "$CHART" -f "$VALUES" --strict
+
+      - name: Validate rendered manifests
+        run: |
+          render() { helm template ci "$CHART" -f "$VALUES" "$@"; }
+          {
+            render
+            render --set demo.enabled=true
+            render --set database.external.enabled=true \
+              --set database.external.host=postgres \
+              --set database.external.existingSecret=postgres
+            render --set ingress.enabled=true --set ingress.host=infrakitchen.example.com \
+              --set ingress.tls.enabled=true --set ingress.tls.secretName=tls \
+              --set networkPolicy.enabled=true \
+              --set networkPolicy.ingressRules.podSelector.app=ingress \
+              --set networkPolicy.egressRules.denyConnectionsToExternal=true \
+              --set backend.pdb.enabled=true --set serviceAccount.create=true
+          } | kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.30.0

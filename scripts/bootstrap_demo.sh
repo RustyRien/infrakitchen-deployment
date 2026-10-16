@@ -1,20 +1,6 @@
 #!/bin/sh
 
-echo "Install RabbitMQ and PostgreSQL operators and CRDs before installing this chart."
-echo "Install cert-manager for certificate management (required for RabbitMQ operator):"
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-
-echo "Wait for cert-manager rollout:"
-kubectl rollout status deployment/cert-manager -n cert-manager --timeout=300s
-kubectl rollout status deployment/cert-manager-cainjector -n cert-manager --timeout=300s
-kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=300s
-
-echo "Install RabbitMQ operator:"
-kubectl apply -f "https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml"
-
-echo "Wait for RabbitMQ operator rollout:"
-kubectl rollout status deployment/rabbitmq-cluster-operator -n rabbitmq-system --timeout=300s
-
+echo "Install PostgreSQL operator and CRDs before installing this chart."
 echo "Install CNPG operator for PostgreSQL:"
 kubectl apply --server-side -f \
   https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.30/releases/cnpg-1.30.0.yaml

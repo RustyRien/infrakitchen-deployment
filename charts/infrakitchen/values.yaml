@@ -8,7 +8,8 @@ global:
   imageRegistry: ""
 
   # -- Global Docker image tag shared by all InfraKitchen workloads unless overridden per workload.
-  imageTag: 0.4.0
+  # Defaults to the chart `appVersion` when empty.
+  imageTag: ""
 
   # -- Global Docker registry secret names as an array
   # </br> E.g. `imagePullSecrets: [myRegistryKeySecretName]`
@@ -31,11 +32,16 @@ commonAnnotations: {}
 # -- Array of extra objects to deploy with the release
 extraDeploy: []
 
+# -- Name of an existing Secret providing `jwt-secret` and `enc-secret` keys.
+# When set, the chart does not create its own application Secret.
+secretName: ""
+
 secrets:
   # -- Fernet-compatible encryption key used for ENCRYPTION_KEY. The chart base64-encodes it for Secret.data.
   encSecret: ""
 
 mcp:
+  # -- Enable the MCP server in the backend.
   enabled: true
 
 demo:
@@ -59,6 +65,9 @@ ingress:
   # -- Path to be used to expose the full route to access the infrakitchen application (e.g: IP.nip.io/infrakitchen)
   path: "/"
 
+  # -- Ingress path type (`Prefix`, `Exact` or `ImplementationSpecific`)
+  pathType: Prefix
+
   # -- Ingress TLS parameters
   tls:
     # -- Enable TLS configuration for the host defined at `ingress.host` parameter
@@ -67,7 +76,7 @@ ingress:
     # -- The name to which the TLS Secret will be called
     secretName: ""
 
-  # -- Service parameters
+  # -- Override the backend Service name targeted by the Ingress
   service_name: ""
 
 ## InfraKitchen Backend parameters
@@ -85,6 +94,10 @@ backend:
   # May be set to 0 in case of GitOps deployment approach.
   revisionHistoryLimit: 10
 
+  # -- Deployment update strategy
+  # <br /> Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  strategy: {}
+
   image:
     # -- Infrakitchen image registry
     registry: "docker.io"
@@ -98,10 +111,9 @@ backend:
     # -- Infrakitchen image digest (digest takes precedence over image tag)
     digest: ""
 
-    # -- Specify a imagePullPolicy.
-    # Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    # -- Image pull policy. Use `Always` only with mutable tags.
     # <br /> Ref: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
 
     # -- Optionally specify an array of imagePullSecrets.
     #  Secrets must be manually created in the namespace.
@@ -154,7 +166,7 @@ backend:
   #   failureThreshold: 3
   #   httpGet:
   #     path: /healthcheck
-  #     port: 8080
+  #     port: backend
   #     scheme: HTTP
   #   initialDelaySeconds: 30
   #   periodSeconds: 10
@@ -163,7 +175,7 @@ backend:
   readinessProbe:
     httpGet:
       path: /healthcheck
-      port: 8080
+      port: backend
     failureThreshold: 10
     initialDelaySeconds: 10
     periodSeconds: 10
@@ -176,7 +188,7 @@ backend:
   #   failureThreshold: 3
   #   httpGet:
   #     path: /healthcheck
-  #     port: 8080
+  #     port: backend
   #     scheme: HTTP
   #   initialDelaySeconds: 60
   #   periodSeconds: 10
@@ -185,21 +197,21 @@ backend:
   livenessProbe:
     httpGet:
       path: /healthcheck
-      port: 8080
+      port: backend
     failureThreshold: 10
     initialDelaySeconds: 10
     periodSeconds: 10
     successThreshold: 1
     timeoutSeconds: 1
-    # -- Startup Probe
-  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
+
+  # -- Startup Probe
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
   # <!-- E.g.
   # startupProbe:
   #   failureThreshold: 3
   #   httpGet:
   #     path: /healthcheck
-  #     port: 8080
+  #     port: backend
   #     scheme: HTTP
   #   initialDelaySeconds: 60
   #   periodSeconds: 10
@@ -210,11 +222,22 @@ backend:
   # -- Security settings for a Pod.
   #  The security settings that you specify for a Pod apply to all Containers in the Pod.
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
-  podSecurityContext: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
 
   # -- Security settings for a Container.
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
-  containerSecurityContext: {}
+  # `readOnlyRootFilesystem` is not enabled because nginx, tofu and git write to the image filesystem.
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
 
   # -- Affinity for pod assignment
   # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
@@ -232,18 +255,51 @@ backend:
   #    value: "value"
   #    effect: "NoSchedule|PreferNoSchedule|NoExecute"
 
-  # -- Annotations to add to the backend deployment pods
+  # -- Annotations to add to the pods
   podAnnotations: {}
 
-  # -- Labels to add to the backend deployment pods
+  # -- Labels to add to the pods
   podLabels: {}
 
   # -- Additional custom annotations for the `Deployment` resource
   annotations: {}
 
+  # -- Mount the ServiceAccount token into the pods
+  automountServiceAccountToken: false
+
+  # -- Topology spread constraints for pod assignment
+  # <br /> Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+  topologySpreadConstraints: []
+
+  # -- Priority class name for the pods
+  priorityClassName: ""
+
+  # -- Seconds the pods are given to shut down gracefully
+  terminationGracePeriodSeconds: 30
+
+  # -- Extra `envFrom` sources (ConfigMaps or Secrets) for the main container
+  extraEnvVarsFrom: []
+
+  # -- Extra volumes for the pods
+  extraVolumes: []
+
+  # -- Extra volume mounts for the main container
+  extraVolumeMounts: []
+
+  # -- PodDisruptionBudget for the backend
+  pdb:
+    # -- Create a PodDisruptionBudget
+    enabled: false
+
+    # -- Minimum number of available pods (number or percentage)
+    minAvailable: 1
+
+    # -- Maximum number of unavailable pods (number or percentage); used instead of `minAvailable` when set
+    maxUnavailable: null
+
 ## InfraKitchen Worker parameters
 ##
-# -- InfraKitchen parameters
+# -- InfraKitchen worker parameters
 # @default -- See below
 worker:
   # -- Switch to enable or disable the worker deployment
@@ -255,6 +311,10 @@ worker:
   # -- Define the [count of deployment revisions](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#clean-up-policy) to be kept.
   # May be set to 0 in case of GitOps deployment approach.
   revisionHistoryLimit: 10
+
+  # -- Deployment update strategy
+  # <br /> Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  strategy: {}
 
   image:
     # -- Infrakitchen image registry
@@ -269,10 +329,9 @@ worker:
     # -- Infrakitchen image digest (digest takes precedence over image tag)
     digest: ""
 
-    # -- Specify a imagePullPolicy.
-    # Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    # -- Image pull policy. Use `Always` only with mutable tags.
     # <br /> Ref: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
 
     # -- Optionally specify an array of imagePullSecrets.
     #  Secrets must be manually created in the namespace.
@@ -318,14 +377,13 @@ worker:
       memory: 1024Mi
 
   # -- Readiness Probe
-  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
   # <!-- E.g.
   # readinessProbe:
   #   failureThreshold: 3
   #   httpGet:
   #     path: /healthcheck
-  #     port: 8080
+  #     port: backend
   #     scheme: HTTP
   #   initialDelaySeconds: 30
   #   periodSeconds: 10
@@ -334,14 +392,13 @@ worker:
   readinessProbe: {}
 
   # -- Liveness Probe
-  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
   # <!-- E.g.
   # livenessProbe:
   #   failureThreshold: 3
   #   httpGet:
   #     path: /healthcheck
-  #     port: 8080
+  #     port: backend
   #     scheme: HTTP
   #   initialDelaySeconds: 60
   #   periodSeconds: 10
@@ -349,15 +406,14 @@ worker:
   #   timeoutSeconds: 2
   livenessProbe: {}
 
-    # -- Startup Probe
-  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
+  # -- Startup Probe
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
   # <!-- E.g.
   # startupProbe:
   #   failureThreshold: 3
   #   httpGet:
   #     path: /healthcheck
-  #     port: 8080
+  #     port: backend
   #     scheme: HTTP
   #   initialDelaySeconds: 60
   #   periodSeconds: 10
@@ -368,11 +424,22 @@ worker:
   # -- Security settings for a Pod.
   #  The security settings that you specify for a Pod apply to all Containers in the Pod.
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
-  podSecurityContext: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
 
   # -- Security settings for a Container.
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
-  containerSecurityContext: {}
+  # `readOnlyRootFilesystem` is not enabled because nginx, tofu and git write to the image filesystem.
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
 
   # -- Affinity for pod assignment
   # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
@@ -390,14 +457,36 @@ worker:
   #    value: "value"
   #    effect: "NoSchedule|PreferNoSchedule|NoExecute"
 
-  # -- Annotations to add to the backend deployment pods
+  # -- Annotations to add to the pods
   podAnnotations: {}
 
-  # -- Labels to add to the backend deployment pods
+  # -- Labels to add to the pods
   podLabels: {}
 
   # -- Additional custom annotations for the `Deployment` resource
   annotations: {}
+
+  # -- Mount the ServiceAccount token into the pods
+  automountServiceAccountToken: false
+
+  # -- Topology spread constraints for pod assignment
+  # <br /> Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+  topologySpreadConstraints: []
+
+  # -- Priority class name for the pods
+  priorityClassName: ""
+
+  # -- Seconds the pods are given to shut down gracefully
+  terminationGracePeriodSeconds: 30
+
+  # -- Extra `envFrom` sources (ConfigMaps or Secrets) for the main container
+  extraEnvVarsFrom: []
+
+  # -- Extra volumes for the pods
+  extraVolumes: []
+
+  # -- Extra volume mounts for the main container
+  extraVolumeMounts: []
 
 ## @section Traffic Exposure parameters
 
@@ -473,23 +562,63 @@ networkPolicy:
 
     # -- Additional custom ingress rules
     customRules: []
-    #   - to:
+    #   - from:
     #       - namespaceSelector:
     #           matchLabels:
-    #             label: example
+    #             kubernetes.io/metadata.name: ingress-nginx
+    #     ports:
+    #       - port: 8080
+    #         protocol: TCP
 
   ## Egress Rules
+  ## Egress is open for all InfraKitchen pods by default: no egress NetworkPolicy is rendered
+  ## unless `denyConnectionsToExternal` is true or `customRules` is set.
+  ## Once either is set, the egress policy applies to the backend, worker and scheduler pods and
+  ## only the listed destinations are allowed. The worker needs outbound access for OpenTofu,
+  ## git and cloud APIs, so allow those explicitly when restricting egress.
   ##
+  ## Example: allow DNS, in-cluster traffic and HTTPS to the internet, but block private networks:
+  ##   egressRules:
+  ##     denyConnectionsToExternal: true
+  ##     customRules:
+  ##       - to:
+  ##           - ipBlock:
+  ##               cidr: 0.0.0.0/0
+  ##               except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16]
+  ##         ports:
+  ##           - port: 443
+  ##             protocol: TCP
+  ##
+  ## Example: allow only DNS, the database and specific external hosts (no in-cluster wildcard):
+  ##   egressRules:
+  ##     denyConnectionsToExternal: false
+  ##     customRules:
+  ##       - ports:
+  ##           - port: 53
+  ##             protocol: UDP
+  ##           - port: 53
+  ##             protocol: TCP
+  ##       - to:
+  ##           - podSelector:
+  ##               matchLabels:
+  ##                 cnpg.io/cluster: <release>-infrakitchen-db
+  ##         ports:
+  ##           - port: 5432
+  ##             protocol: TCP
+  ##       - to:
+  ##           - ipBlock:
+  ##               cidr: 203.0.113.0/24
+  ##         ports:
+  ##           - port: 443
+  ##             protocol: TCP
   egressRules:
-    # -- Deny external connections. Should not be enabled when working with an external database.
+    # -- Allow only DNS and traffic to pods inside the cluster; block everything external.
+    # Should not be enabled alone when working with an external database or when the worker needs internet access.
     denyConnectionsToExternal: false
 
-    # -- Additional custom egress rules
+    # -- Additional egress rules (NetworkPolicy `egress` entries). Setting any rule restricts egress
+    # to the listed destinations. See the examples above.
     customRules: []
-    #   - to:
-    #       - namespaceSelector:
-    #           matchLabels:
-    #             label: example
 
 # -- Database connection settings consumed by InfraKitchen workloads.
 # @default -- See below
@@ -548,59 +677,6 @@ cnpg:
     # -- Kubernetes secret type for the generated CNPG bootstrap secret.
     secretType: kubernetes.io/basic-auth
 
-rabbitmq:
-  cluster:
-    # -- Name of the managed RabbitmqCluster resource.
-    name: ""
-
-    # -- Number of RabbitMQ replicas.
-    replicas: 1
-
-    persistence:
-      # -- Enable persistent storage for the managed RabbitMQ cluster.
-      enabled: false
-
-      # -- Size of the RabbitMQ persistent volume claim.
-      storage: 4Gi
-
-    resources: {}
-
-    # -- Additional RabbitMQ configuration appended to rabbitmq.conf.
-    additionalConfig: |-
-      consumer_timeout = 144000000
-      deprecated_features.permit.transient_nonexcl_queues = true
-
-  auth:
-    # -- Existing secret containing RabbitMQ credentials for managed RabbitMQ.
-    # The Secret must provide `username` and `password` keys.
-    # If not set, the chart uses the operator-generated `<cluster>-default-user` secret.
-    existingSecret: ""
-
-    # -- RabbitMQ username for the managed cluster when supplying your own secret.
-    username: ""
-
-    # -- RabbitMQ password for the managed cluster when supplying your own secret.
-    password: ""
-
-  external:
-    # -- Use an external RabbitMQ instance instead of rendering a RabbitmqCluster.
-    enabled: false
-
-    # -- RabbitMQ connection URI used when `rabbitmq.external.enabled` is true.
-    # If set, no RabbitMQ credential secret is referenced by the application pods.
-    uri: ""
-
-    # -- Existing secret containing external RabbitMQ credentials.
-    # Used when `rabbitmq.external.uri` is not set. The Secret must provide
-    # `username` and `password` keys.
-    existingSecret: ""
-
-    # -- External RabbitMQ hostname used when `rabbitmq.external.uri` is not set.
-    host: ""
-
-    # -- External RabbitMQ port used when `rabbitmq.external.uri` is not set.
-    port: 5672
-
 # -- Service Account Configuration
 # @default -- See below
 serviceAccount:
@@ -617,12 +693,12 @@ serviceAccount:
   # -- Additional custom annotations for the ServiceAccount.
   annotations: {}
 
-  # -- Auto-mount the service account token in the pod
-  automountServiceAccountToken: true
+  # -- Auto-mount the service account token (pods also set their own `automountServiceAccountToken`)
+  automountServiceAccountToken: false
 
 ## InfraKitchen Scheduler parameters
 ##
-# -- InfraKitchen parameters
+# -- InfraKitchen scheduler parameters
 # @default -- See below
 scheduler:
   # -- Switch to enable or disable the scheduler deployment
@@ -634,6 +710,12 @@ scheduler:
   # -- Define the [count of deployment revisions](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#clean-up-policy) to be kept.
   # May be set to 0 in case of GitOps deployment approach.
   revisionHistoryLimit: 10
+
+  # -- Deployment update strategy
+  # <br /> Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  # Recreate avoids running two schedulers at once during a rollout.
+  strategy:
+    type: Recreate
 
   image:
     # -- Infrakitchen image registry
@@ -648,10 +730,9 @@ scheduler:
     # -- Infrakitchen image digest (digest takes precedence over image tag)
     digest: ""
 
-    # -- Specify a imagePullPolicy.
-    # Defaults to 'Always' if image tag is 'latest', else set to 'IfNotPresent'
+    # -- Image pull policy. Use `Always` only with mutable tags.
     # <br /> Ref: https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
-    pullPolicy: Always
+    pullPolicy: IfNotPresent
 
     # -- Optionally specify an array of imagePullSecrets.
     #  Secrets must be manually created in the namespace.
@@ -697,14 +778,13 @@ scheduler:
       memory: 1024Mi
 
   # -- Readiness Probe
-  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
   # <!-- E.g.
   # readinessProbe:
   #   failureThreshold: 3
   #   httpGet:
   #     path: /healthcheck
-  #     port: 8080
+  #     port: backend
   #     scheme: HTTP
   #   initialDelaySeconds: 30
   #   periodSeconds: 10
@@ -713,14 +793,13 @@ scheduler:
   readinessProbe: {}
 
   # -- Liveness Probe
-  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
   # <!-- E.g.
   # livenessProbe:
   #   failureThreshold: 3
   #   httpGet:
   #     path: /healthcheck
-  #     port: 8080
+  #     port: backend
   #     scheme: HTTP
   #   initialDelaySeconds: 60
   #   periodSeconds: 10
@@ -729,14 +808,13 @@ scheduler:
   livenessProbe: {}
 
   # -- Startup Probe
-  # Infrakitchen doesn't provide any health endpoints by default. A simple one can be added like this: https://infrakitchen.io/docs/plugins/observability/#health-checks
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes
   # <!-- E.g.
   # startupProbe:
   #   failureThreshold: 3
   #   httpGet:
   #     path: /healthcheck
-  #     port: 8080
+  #     port: backend
   #     scheme: HTTP
   #   initialDelaySeconds: 60
   #   periodSeconds: 10
@@ -747,11 +825,22 @@ scheduler:
   # -- Security settings for a Pod.
   #  The security settings that you specify for a Pod apply to all Containers in the Pod.
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
-  podSecurityContext: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
 
   # -- Security settings for a Container.
   # <br /> Ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-container
-  containerSecurityContext: {}
+  # `readOnlyRootFilesystem` is not enabled because nginx, tofu and git write to the image filesystem.
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
 
   # -- Affinity for pod assignment
   # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
@@ -769,11 +858,33 @@ scheduler:
   #    value: "value"
   #    effect: "NoSchedule|PreferNoSchedule|NoExecute"
 
-  # -- Annotations to add to the backend deployment pods
+  # -- Annotations to add to the pods
   podAnnotations: {}
 
-  # -- Labels to add to the backend deployment pods
+  # -- Labels to add to the pods
   podLabels: {}
 
   # -- Additional custom annotations for the `Deployment` resource
   annotations: {}
+
+  # -- Mount the ServiceAccount token into the pods
+  automountServiceAccountToken: false
+
+  # -- Topology spread constraints for pod assignment
+  # <br /> Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+  topologySpreadConstraints: []
+
+  # -- Priority class name for the pods
+  priorityClassName: ""
+
+  # -- Seconds the pods are given to shut down gracefully
+  terminationGracePeriodSeconds: 30
+
+  # -- Extra `envFrom` sources (ConfigMaps or Secrets) for the main container
+  extraEnvVarsFrom: []
+
+  # -- Extra volumes for the pods
+  extraVolumes: []
+
+  # -- Extra volume mounts for the main container
+  extraVolumeMounts: []

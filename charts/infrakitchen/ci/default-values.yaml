@@ -1,0 +1,6 @@
+# Values used by chart-testing and the lint workflow.
+cnpg:
+  bootstrap:
+    password: ci-password
+secrets:
+  encSecret: MWhVVmYtQ3dFNDc3ODdrTEJ1TUx4cUpLcm1ZTFQ4TlRsZlY0RnpMV0owVT0=

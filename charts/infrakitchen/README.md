@@ -1,5 +1,28 @@
 # InfraKitchen Helm Chart
 
+Deploys the InfraKitchen backend, worker and scheduler, backed by PostgreSQL.
+Requires Kubernetes 1.30+.
+
+## Workloads
+
+The chart renders three Deployments from the same image: `backend` (API, UI and migrations), `worker` and `scheduler`.
+Each one has its own block in `values.yaml` with the same set of options (image, resources, probes, security contexts, scheduling, extra env/volumes/containers).
+
+- The image tag defaults to the chart `appVersion`. Override it for all workloads with `global.imageTag`, or per workload with `<workload>.image.tag`.
+- The scheduler uses the `Recreate` strategy so two schedulers never run at the same time during a rollout.
+- `backend.pdb.enabled=true` adds a PodDisruptionBudget for the backend.
+
+## Security defaults
+
+Pods run as the image's non-root `infrakitchen` user (UID/GID 1000) with the `RuntimeDefault` seccomp profile.
+Containers drop all capabilities and disallow privilege escalation, and the ServiceAccount token is not mounted.
+`readOnlyRootFilesystem` is not enabled because nginx, OpenTofu and git write to the image filesystem.
+Override `<workload>.podSecurityContext` and `<workload>.containerSecurityContext` if your platform needs different settings.
+
+## Values validation
+
+`values.schema.json` rejects unknown keys and wrong types, so typos and settings removed in newer chart versions fail at install time instead of being silently ignored.
+
 ## PostgreSQL
 
 This chart manages a CloudNativePG `Cluster` by default.
@@ -22,30 +45,6 @@ Set:
 - optionally `database.external.passwordKey`
 
 In external mode, this chart does not render CNPG resources.
-
-## RabbitMQ
-
-This chart manages a RabbitMQ `RabbitmqCluster` by default.
-
-- Install the RabbitMQ Cluster Operator and CRDs before installing this chart.
-- Follow the official operator install docs: <https://www.rabbitmq.com/kubernetes/operator/install-operator>
-- If `rabbitmq.auth.existingSecret` is not set, this chart uses the RabbitMQ operator-generated `<cluster-name>-default-user` Secret.
-- In managed mode, InfraKitchen reads `username` and `password` from that Secret and builds `BROKER_URL` against the managed RabbitMQ service.
-
-### Managed RabbitMQ
-
-Install the chart after the RabbitMQ Cluster Operator is available.
-If you want to override the operator-generated secret, set `rabbitmq.auth.existingSecret` to a Secret that provides `username` and `password`.
-
-### External RabbitMQ
-
-Set:
-
-- `rabbitmq.external.enabled=true`
-- either `rabbitmq.external.uri`
-- or `rabbitmq.external.host` and `rabbitmq.external.existingSecret`
-
-In external mode, this chart does not render RabbitMQ operator resources.
 
 ## Secrets
 
@@ -76,9 +75,15 @@ secrets:
 
 If `secretName` is set, the referenced Kubernetes Secret must already contain both `jwt-secret` and `enc-secret`.
 
+### GitOps (Argo CD, Flux) and `helm template`
+
+Reusing stored secrets relies on Helm `lookup`, which returns nothing under `helm template` and most GitOps tools.
+There, `jwt-secret` would be regenerated on every render and `secrets.encSecret`/`cnpg.bootstrap.password` would be required every time.
+For these setups, create the Secrets yourself and set `secretName` and `cnpg.bootstrap.existingSecret` (or use an external database).
+
 ## Demo Fixtures
 
-Set `demo.enabled=true` to create a Init container that runs `/app/fixtures/generate_entities.py`.
+Set `demo.enabled=true` to add an init container to the backend that runs `/app/fixtures/generate_entities.py`.
 
-- The Job uses the same database configuration as the InfraKitchen pods.
+- The init container uses the same database configuration as the InfraKitchen pods.
 - This is intended for demo environments.

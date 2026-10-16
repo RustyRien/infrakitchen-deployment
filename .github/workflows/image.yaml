@@ -7,6 +7,11 @@ on:
         description: "Branch or tag name"
         required: true
         type: string
+      release:
+        description: "Release build: tag the image with the plain VERSION (e.g. 0.7.0) without a timestamp"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,7 +26,7 @@ jobs:
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@8410ad0602e1e429cee44a835ae9f77f654a6694 # v4.0.0
+      - uses: actions/checkout@v7.0.0
 
       - uses: actions/checkout@v7.0.0
         with:
@@ -31,7 +36,7 @@ jobs:
 
       - name: Set image tag
         run: |
-          if [ "${{ github.event.inputs.branch_name }}" == "main" ]; then
+          if [ "${{ github.event.inputs.release }}" == "true" ]; then
             echo "tag=$(cat ./infrakitchen/VERSION)" >> $GITHUB_OUTPUT
           else
             echo "tag=$(cat ./infrakitchen/VERSION)-$(date +'%Y%m%d%H%M%S')" >> $GITHUB_OUTPUT
