@@ -1,4 +1,4 @@
-FROM docker.io/library/python:3.14.6-slim-bookworm@sha256:86f975aca15cf04a40b399eebede9aea7c82eae084d1f1a0a6ef6bcaae871a30 AS python_builder
+FROM docker.io/library/python:3.15.1-slim-bookworm@sha256:575f8bc12ec26542e0678bc6b60e385218248019d433157ec327264a78c3a853 AS python_builder
 
 ARG TARGETARCH
 
@@ -35,9 +35,9 @@ ENV UV_COMPILE_BYTECODE=1 \
   UV_PROJECT_ENVIRONMENT=/app/.venv
 
 RUN pip install --no-cache-dir uv && \
-  cd server && uv sync --no-dev --frozen
+  cd server && uv sync --no-dev --frozen --no-install-project
 
-RUN uv run --project server /app/server/generate_build_info.py
+RUN python /app/server/generate_build_info.py
 
 RUN find /app/.venv -type d -name "__pycache__" -prune -exec rm -rf {} + && \
   find /app/.venv -type d -name "tests" -prune -exec rm -rf {} + && \
@@ -54,7 +54,7 @@ COPY ./ /app
 RUN cd ./ui && yarn install --immutable && yarn cache clean && yarn build
 
 
-FROM docker.io/library/python:3.14.6-slim-bookworm@sha256:86f975aca15cf04a40b399eebede9aea7c82eae084d1f1a0a6ef6bcaae871a30
+FROM docker.io/library/python:3.15.1-slim-bookworm@sha256:575f8bc12ec26542e0678bc6b60e385218248019d433157ec327264a78c3a853
 
 RUN apt-get update && apt-get install -y --no-install-recommends nginx git openssh-client && \
   apt-get clean && rm -rf /var/lib/apt/lists/* && \
@@ -80,6 +80,7 @@ COPY --from=python_builder /tofu /usr/local/bin/tofu
 COPY --from=python_builder /usr/local/aws-cli/ /usr/local/aws-cli/
 COPY --from=python_builder /aws-cli-bin/ /usr/local/bin/
 COPY --from=python_builder /app/server/.env /app/.env
+COPY --from=python_builder /app/server/build-info.json /app/build-info.json
 COPY ./docs/examples/docker/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh && \
