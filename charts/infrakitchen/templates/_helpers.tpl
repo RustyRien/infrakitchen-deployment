@@ -92,7 +92,7 @@ Usage: {{ include "infrakitchen.metadata" (dict "component" "infrakitchen" "labe
 */}}
 {{- define "infrakitchen.metadata" -}}
 {{- $ctx := .context -}}
-namespace: {{ $ctx.Release.Namespace | quote }}
+namespace: {{ default $ctx.Release.Namespace .namespace | quote }}
 labels:
   {{- include "infrakitchen.labels.standard" $ctx | nindent 2 }}
   {{- if .component }}
@@ -145,6 +145,30 @@ Return environment variables shared by all InfraKitchen containers.
     secretKeyRef:
       name: {{ include "infrakitchen.secretName" . }}
       key: enc-secret
+- name: TF_PLUGIN_CACHE_ENABLED
+  value: {{ .Values.tofuCache.enabled | quote }}
+{{- with .Values.tofuCache.dir }}
+- name: TF_PLUGIN_CACHE_DIR
+  value: {{ . | quote }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Return environment variables for workloads that manage on-demand worker Pods (backend, scheduler).
+*/}}
+{{- define "infrakitchen.onDemandEnv" -}}
+{{- if .Values.workerOnDemand.enabled }}
+- name: POD_NAME
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.name
+- name: WORKER_AUTOSCALER_INTERVAL_SECONDS
+  value: {{ .Values.workerOnDemand.autoscaler.intervalSeconds | quote }}
+- name: WORKER_START_TIMEOUT_SECONDS
+  value: {{ .Values.workerOnDemand.autoscaler.startTimeoutSeconds | quote }}
+- name: WORKER_FAILED_RETENTION_SECONDS
+  value: {{ .Values.workerOnDemand.autoscaler.failedRetentionSeconds | quote }}
+{{- end }}
 {{- end -}}
 
 {{/*
@@ -174,6 +198,10 @@ Return the demo fixtures init container.
     - PYTHONPATH=/app /app/.venv/bin/python /app/fixtures/generate_entities.py
   env:
     {{- include "infrakitchen.commonEnv" . | nindent 4 }}
+  {{- with .Values.demo.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end -}}
 
 {{/*
@@ -184,6 +212,7 @@ Params:
   name           - resource name
   component      - app.kubernetes.io/component label
   containerName  - main container name
+  manageWorkers  - optional bool, mount the SA token when workerOnDemand is enabled
   extraEnv       - optional YAML string of extra env entries rendered before values.extraEnvVars
   initContainers - optional YAML string of chart-managed init containers
 */}}
@@ -221,7 +250,7 @@ spec:
       {{- end }}
     spec:
       serviceAccountName: {{ include "infrakitchen.serviceAccountName" $ctx }}
-      automountServiceAccountToken: {{ $v.automountServiceAccountToken }}
+      automountServiceAccountToken: {{ if or $v.automountServiceAccountToken (and .manageWorkers $ctx.Values.workerOnDemand.enabled) }}true{{ else }}false{{ end }}
       {{- include "infrakitchen.renderImagePullSecrets" $imageArgs | nindent 6 }}
       {{- with $v.priorityClassName }}
       priorityClassName: {{ . | quote }}
@@ -325,7 +354,7 @@ spec:
 Create the name of the service account to use.
 */}}
 {{- define "infrakitchen.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create -}}
+{{- if or .Values.serviceAccount.create .Values.workerOnDemand.enabled -}}
     {{ default (include "infrakitchen.fullname" .) .Values.serviceAccount.name }}
 {{- else -}}
     {{ default "default" .Values.serviceAccount.name }}
