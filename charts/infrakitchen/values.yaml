@@ -48,6 +48,45 @@ demo:
   # -- Run demo fixture generation as a backend init container before the app starts.
   enabled: false
 
+  # -- Resource requests/limits for the demo fixtures init container
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# -- On-demand workers: the scheduler autoscaler spawns worker Pods from worker templates.
+# Creates a ServiceAccount, a Role/RoleBinding for managing Pods and mounts the token into backend and scheduler.
+# Resources of the spawned Pods come from the worker template manifest, not from this chart.
+# @default -- See below
+workerOnDemand:
+  # -- Enable on-demand workers support
+  enabled: false
+
+  rbac:
+    # -- Extra namespaces worker templates may spawn Pods into (the release namespace is always covered).
+    # Secrets/ConfigMaps referenced by inherited env must also exist there.
+    extraNamespaces: []
+
+  autoscaler:
+    # -- How often the scheduler reconciles on-demand workers (`WORKER_AUTOSCALER_INTERVAL_SECONDS`)
+    intervalSeconds: 15
+    # -- A spawned worker still pending after this is deleted (`WORKER_START_TIMEOUT_SECONDS`)
+    startTimeoutSeconds: 600
+    # -- Failed workers are kept this long for logs, then deleted (`WORKER_FAILED_RETENTION_SECONDS`)
+    failedRetentionSeconds: 3600
+
+# -- OpenTofu provider plugin cache
+# @default -- See below
+tofuCache:
+  # -- Enable the provider plugin cache (`TF_PLUGIN_CACHE_ENABLED`)
+  enabled: true
+  # -- Cache directory (`TF_PLUGIN_CACHE_DIR`). Defaults to a directory under the container's temp dir.
+  # Pod-local unless a volume is mounted there via `extraVolumes`/`extraVolumeMounts`.
+  dir: ""
+
 # -- Ingress parameters
 ingress:
   # -- Enable the creation of the ingress resource
@@ -144,21 +183,13 @@ backend:
 
   # -- Resource requests/limits
   # <br /> Ref: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#resource-requests-and-limits-of-pod-and-container
-  # <!-- E.g.
-  # resources:
-  #   limits:
-  #     memory: 1Gi
-  #     cpu: 1000m
-  #   requests:
-  #     memory: 250Mi
-  #     cpu: 100m -->
   resources:
     requests:
-      cpu: 100m
+      cpu: 700m
       memory: 256Mi
     limits:
-      cpu: 200m
-      memory: 1024Mi
+      cpu: 1500m
+      memory: 1Gi
 
   # -- Readiness Probe
   # <!-- E.g.
@@ -665,6 +696,14 @@ cnpg:
       # -- Persistent volume size for each CNPG instance.
       size: 4Gi
 
+    # -- Resource requests/limits for the CNPG instances
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
   bootstrap:
     # -- Existing secret containing the bootstrap/application credentials.
     # The Secret must provide `username` and `password` keys and the username must match `database.user`.
@@ -693,7 +732,8 @@ serviceAccount:
   # -- Additional custom annotations for the ServiceAccount.
   annotations: {}
 
-  # -- Auto-mount the service account token (pods also set their own `automountServiceAccountToken`)
+  # -- Auto-mount the service account token (pods also set their own `automountServiceAccountToken`;
+  # backend and scheduler always mount it when `workerOnDemand.enabled`)
   automountServiceAccountToken: false
 
 ## InfraKitchen Scheduler parameters

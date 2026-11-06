@@ -3,7 +3,7 @@
 {{- if .Values.demo.enabled }}
 {{- $initContainers = include "infrakitchen.demoInitContainer" . }}
 {{- end }}
-{{- $extraEnv := include "infrakitchen.backendEnv" . }}
+{{- $extraEnv := print (include "infrakitchen.backendEnv" .) "\n" (include "infrakitchen.onDemandEnv" .) | trim }}
 {{- include "infrakitchen.workload" (dict
       "context" $
       "values" .Values.backend
@@ -11,5 +11,6 @@
       "component" "infrakitchen"
       "containerName" "infrakitchen-backend"
       "extraEnv" $extraEnv
+      "manageWorkers" true
       "initContainers" $initContainers) }}
 {{- end }}

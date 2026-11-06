@@ -66,6 +66,9 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "resources": {
+          "type": "object"
         }
       }
     },
@@ -746,6 +749,57 @@
         }
       }
     },
+    "workerOnDemand": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "rbac": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "extraNamespaces": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "autoscaler": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "intervalSeconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "startTimeoutSeconds": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "failedRetentionSeconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "tofuCache": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "dir": {
+          "type": "string"
+        }
+      }
+    },
     "cnpg": {
       "type": "object",
       "additionalProperties": false,
@@ -769,6 +823,9 @@
                   "type": "string"
                 }
               }
+            },
+            "resources": {
+              "type": "object"
             }
           }
         },

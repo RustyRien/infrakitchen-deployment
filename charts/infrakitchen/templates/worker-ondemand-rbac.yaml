@@ -1,0 +1,36 @@
+{{- if .Values.workerOnDemand.enabled }}
+{{- $namespaces := concat (list .Release.Namespace) .Values.workerOnDemand.rbac.extraNamespaces | uniq }}
+{{- range $ns := $namespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "infrakitchen.fullname" $ }}-worker-manager
+  {{- include "infrakitchen.metadata" (dict "component" "infrakitchen" "namespace" $ns "context" $) | nindent 2 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # used by the worker template Validate check for inherited Secrets/ConfigMaps
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "infrakitchen.fullname" $ }}-worker-manager
+  {{- include "infrakitchen.metadata" (dict "component" "infrakitchen" "namespace" $ns "context" $) | nindent 2 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "infrakitchen.fullname" $ }}-worker-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "infrakitchen.serviceAccountName" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- end }}

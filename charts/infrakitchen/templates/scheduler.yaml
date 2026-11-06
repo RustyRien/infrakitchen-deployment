@@ -4,5 +4,7 @@
       "values" .Values.scheduler
       "name" (printf "%s-scheduler" (include "infrakitchen.fullname" .))
       "component" "infrakitchen-scheduler"
-      "containerName" "infrakitchen-scheduler") }}
+      "containerName" "infrakitchen-scheduler"
+      "extraEnv" (include "infrakitchen.onDemandEnv" .)
+      "manageWorkers" true) }}
 {{- end }}

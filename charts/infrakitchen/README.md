@@ -1,6 +1,6 @@
 # InfraKitchen Helm Chart
 
-Deploys the InfraKitchen backend, worker and scheduler, backed by PostgreSQL.
+Deploys the [InfraKitchen](https://github.com/electrolux-oss/infrakitchen) backend, worker and scheduler, backed by PostgreSQL.
 Requires Kubernetes 1.30+.
 
 ## Workloads
@@ -15,13 +15,25 @@ Each one has its own block in `values.yaml` with the same set of options (image,
 ## Security defaults
 
 Pods run as the image's non-root `infrakitchen` user (UID/GID 1000) with the `RuntimeDefault` seccomp profile.
-Containers drop all capabilities and disallow privilege escalation, and the ServiceAccount token is not mounted.
+Containers drop all capabilities and disallow privilege escalation, and the ServiceAccount token is not mounted (except for backend and scheduler when `workerOnDemand.enabled=true`).
 `readOnlyRootFilesystem` is not enabled because nginx, OpenTofu and git write to the image filesystem.
 Override `<workload>.podSecurityContext` and `<workload>.containerSecurityContext` if your platform needs different settings.
 
-## Values validation
+## On-demand workers
 
-`values.schema.json` rejects unknown keys and wrong types, so typos and settings removed in newer chart versions fail at install time instead of being silently ignored.
+Set `workerOnDemand.enabled=true` to let the scheduler spawn worker Pods from worker templates (see `examples/ondemand-workers.yaml`). The chart then:
+
+- creates the ServiceAccount and a Role/RoleBinding (`pods` get/list/create/delete, `pods/log` get, `secrets`/`configmaps` list) in the release namespace and every namespace in `workerOnDemand.rbac.extraNamespaces`;
+- mounts the ServiceAccount token into the backend and scheduler (the static worker does not get it);
+- sets `POD_NAME` (downward API) and `WORKER_AUTOSCALER_INTERVAL_SECONDS`, `WORKER_START_TIMEOUT_SECONDS`, `WORKER_FAILED_RETENTION_SECONDS` on backend and scheduler.
+
+Spawned Pods inherit the image and env (including Secret references) of the InfraKitchen container, so Secrets and ConfigMaps must also exist in any extra namespace.
+Their resources come from the worker template manifest in InfraKitchen (default 500m/512Mi requests), not from this chart.
+
+## OpenTofu plugin cache
+
+`tofuCache.enabled` (default `true`) sets `TF_PLUGIN_CACHE_ENABLED`; `tofuCache.dir` optionally sets `TF_PLUGIN_CACHE_DIR`.
+By default the cache lives in the container's temp dir, so it is lost on restart and not shared. Mount a volume there via `<workload>.extraVolumes`/`extraVolumeMounts` to persist it; keep it on local disk, not a network share.
 
 ## PostgreSQL
 
@@ -87,3 +99,6 @@ Set `demo.enabled=true` to add an init container to the backend that runs `/app/
 
 - The init container uses the same database configuration as the InfraKitchen pods.
 - This is intended for demo environments.
+- The fixtures create PostgreSQL state backend integrations whose databases (`ik_tf_states_<env>`) are created on demand,
+  so the chart-managed CNPG cluster grants `CREATEDB` to `database.user`. This only applies when the cluster is created;
+  for an existing cluster run `ALTER ROLE <database.user> CREATEDB` as the `postgres` superuser.

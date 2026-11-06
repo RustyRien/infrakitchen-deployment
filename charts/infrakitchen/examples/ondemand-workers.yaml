@@ -1,0 +1,10 @@
+# Example values enabling on-demand workers.
+# Creates the ServiceAccount, Role/RoleBinding (release namespace + extraNamespaces)
+# and mounts the token into backend and scheduler.
+workerOnDemand:
+  enabled: true
+  # rbac:
+  #   extraNamespaces: [ik-workers]
+worker:
+  # static worker is optional when relying on on-demand workers only
+  enabled: false

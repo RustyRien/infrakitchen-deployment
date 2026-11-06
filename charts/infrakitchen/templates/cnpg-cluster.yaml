@@ -8,10 +8,19 @@ spec:
   instances: {{ .Values.cnpg.cluster.instances }}
   storage:
     size: {{ .Values.cnpg.cluster.storage.size }}
+  {{- with .Values.cnpg.cluster.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   bootstrap:
     initdb:
       database: {{ .Values.database.name }}
       owner: {{ .Values.database.user }}
       secret:
         name: {{ include "infrakitchen.database.secretName" . }}
+      {{- if .Values.demo.enabled }}
+      # Demo fixtures create PostgreSQL state backend databases (ik_tf_states_<env>) for their integrations
+      postInitSQL:
+        - ALTER ROLE {{ .Values.database.user | quote }} CREATEDB
+      {{- end }}
 {{- end }}
